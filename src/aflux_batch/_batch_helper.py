@@ -6,7 +6,6 @@ from collections.abc import (
     Callable,
     Iterable,
     Iterator,
-    Sequence,
 )
 from typing import Any, cast
 
@@ -48,12 +47,14 @@ def iter_batch[T](
 def run_batch[T](
     executor: concurrent.futures.Executor,
     func: Callable[..., T],
-    kwargs_list: Sequence[dict[str, Any]],
+    kwargs_list: Iterable[dict[str, Any]],
     batch_size: int = 32,
 ) -> list[T]:
-    results: list[T | None] = [None] * len(kwargs_list)
+    results: list[T | None] = []
 
     for index, result in iter_batch(executor, func, kwargs_list, batch_size):
+        while len(results) <= index:
+            results.append(None)
         results[index] = result
 
     return cast(list[T], results)
@@ -96,12 +97,14 @@ async def aiter_batch[T](
 async def arun_batch[T](
     task_group: asyncio.TaskGroup,
     func: Callable[..., Awaitable[T]],
-    kwargs_list: Sequence[dict[str, Any]],
+    kwargs_list: Iterable[dict[str, Any]],
     batch_size: int = 32,
 ) -> list[T]:
-    results: list[T | None] = [None] * len(kwargs_list)
+    results: list[T | None] = []
 
     async for index, result in aiter_batch(task_group, func, kwargs_list, batch_size):
+        while len(results) <= index:
+            results.append(None)
         results[index] = result
 
     return cast(list[T], results)

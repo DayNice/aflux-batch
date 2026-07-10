@@ -12,12 +12,18 @@ def anyio_backend():
     return "asyncio"
 
 
+def sync_slow_task(index: int, sleep_time: float) -> int:
+    time.sleep(sleep_time)
+    return index
+
+
+async def async_slow_task(index: int, sleep_time: float) -> int:
+    await asyncio.sleep(sleep_time)
+    return index
+
+
 class TestSyncBatch:
     def test_order_preservation(self) -> None:
-        def slow_task(index: int, sleep_time: float) -> int:
-            time.sleep(sleep_time)
-            return index
-
         kwargs_list = [
             {"index": 0, "sleep_time": 0.03},
             {"index": 1, "sleep_time": 0.02},
@@ -25,8 +31,18 @@ class TestSyncBatch:
             {"index": 3, "sleep_time": 0.00},
         ]
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            results = run_batch(executor, slow_task, kwargs_list, batch_size=4)
+        batch_size = 4
+        with concurrent.futures.ThreadPoolExecutor(batch_size) as executor:
+            results = run_batch(executor, sync_slow_task, kwargs_list, batch_size)
+
+        assert results == [0, 1, 2, 3]
+
+    def test_iterator_handling(self) -> None:
+        kwargs_iter = ({"index": i, "sleep_time": max(0.0, 0.03 - 0.01 * i)} for i in range(4))
+
+        batch_size = 4
+        with concurrent.futures.ThreadPoolExecutor(batch_size) as executor:
+            results = run_batch(executor, sync_slow_task, kwargs_iter, batch_size)
 
         assert results == [0, 1, 2, 3]
 
@@ -34,10 +50,6 @@ class TestSyncBatch:
 class TestAsyncBatch:
     @pytest.mark.anyio
     async def test_order_preservation(self) -> None:
-        async def slow_task(index: int, sleep_time: float) -> int:
-            await asyncio.sleep(sleep_time)
-            return index
-
         kwargs_list = [
             {"index": 0, "sleep_time": 0.03},
             {"index": 1, "sleep_time": 0.02},
@@ -46,6 +58,15 @@ class TestAsyncBatch:
         ]
 
         async with asyncio.TaskGroup() as task_group:
-            results = await arun_batch(task_group, slow_task, kwargs_list, batch_size=4)
+            results = await arun_batch(task_group, async_slow_task, kwargs_list, batch_size=4)
+
+        assert results == [0, 1, 2, 3]
+
+    @pytest.mark.anyio
+    async def test_iterator_handling(self) -> None:
+        kwargs_iter = ({"index": i, "sleep_time": max(0.0, 0.03 - 0.01 * i)} for i in range(4))
+
+        async with asyncio.TaskGroup() as task_group:
+            results = await arun_batch(task_group, async_slow_task, kwargs_iter, batch_size=4)
 
         assert results == [0, 1, 2, 3]

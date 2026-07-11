@@ -1,4 +1,5 @@
 from ._batch_helper import (
+    Payload,
     aiter_batch,
     arun_batch,
     iter_batch,
@@ -6,6 +7,7 @@ from ._batch_helper import (
 )
 
 __all__ = [
+    "Payload",
     "aiter_batch",
     "arun_batch",
     "iter_batch",

@@ -41,20 +41,20 @@ class MockWorkload:
 class TestSyncBatch:
     def test_with_list(self) -> None:
         workload = MockWorkload()
-        kwargs_input = [{"index": i, "sleep_time": 0.05 if i % 2 == 0 else 0.0} for i in range(20)]
+        kwargs_iterable = [{"index": i, "sleep_time": 0.05 if i % 2 == 0 else 0.0} for i in range(20)]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            results = run_batch(executor, workload.sync_task, kwargs_input, batch_size=4)
+            results = run_batch(executor, workload.sync_task, kwargs_iterable, batch_size=4)
 
         assert results == list(range(20))
         assert workload.max_active == 4
 
     def test_with_iterator(self) -> None:
         workload = MockWorkload()
-        kwargs_input = ({"index": i, "sleep_time": 0.05 if i % 2 == 0 else 0.0} for i in range(20))
+        kwargs_iterable = ({"index": i, "sleep_time": 0.05 if i % 2 == 0 else 0.0} for i in range(20))
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            results = run_batch(executor, workload.sync_task, kwargs_input, batch_size=4)
+            results = run_batch(executor, workload.sync_task, kwargs_iterable, batch_size=4)
 
         assert results == list(range(20))
         assert workload.max_active == 4
@@ -64,10 +64,10 @@ class TestAsyncBatch:
     @pytest.mark.anyio
     async def test_with_list(self) -> None:
         workload = MockWorkload()
-        kwargs_input = [{"index": i, "sleep_time": 0.05 if i % 2 == 0 else 0.0} for i in range(20)]
+        kwargs_iterable = [{"index": i, "sleep_time": 0.05 if i % 2 == 0 else 0.0} for i in range(20)]
 
         async with asyncio.TaskGroup() as task_group:
-            results = await arun_batch(task_group, workload.async_task, kwargs_input, batch_size=4)
+            results = await arun_batch(task_group, workload.async_task, kwargs_iterable, batch_size=4)
 
         assert results == list(range(20))
         assert workload.max_active == 4
@@ -75,10 +75,10 @@ class TestAsyncBatch:
     @pytest.mark.anyio
     async def test_with_iterator(self) -> None:
         workload = MockWorkload()
-        kwargs_list = ({"index": i, "sleep_time": max(0.0, 0.05 - 0.005 * i)} for i in range(20))
+        kwargs_iterable = ({"index": i, "sleep_time": max(0.0, 0.05 - 0.005 * i)} for i in range(20))
 
         async with asyncio.TaskGroup() as task_group:
-            results = await arun_batch(task_group, workload.async_task, kwargs_list, batch_size=4)
+            results = await arun_batch(task_group, workload.async_task, kwargs_iterable, batch_size=4)
 
         assert results == list(range(20))
         assert workload.max_active == 4

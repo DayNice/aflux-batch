@@ -23,7 +23,7 @@ def _sync_indexed_wrapper[T, **P](
 def iter_batch[T](
     executor: concurrent.futures.Executor,
     func: Callable[..., T],
-    kwargs_list: Iterable[dict[str, Any]],
+    kwargs_iterable: Iterable[dict[str, Any]],
     batch_size: int = 32,
 ) -> Iterator[tuple[int, T]]:
     batch_size = max(1, batch_size)
@@ -31,7 +31,7 @@ def iter_batch[T](
     pending: set[concurrent.futures.Future[tuple[int, T]]] = set()
     done: set[concurrent.futures.Future[tuple[int, T]]]
 
-    for i, kwargs in enumerate(kwargs_list):
+    for i, kwargs in enumerate(kwargs_iterable):
         while len(pending) >= batch_size:
             done, pending = concurrent.futures.wait(pending, return_when=concurrent.futures.FIRST_COMPLETED)
             for future in done:
@@ -47,12 +47,12 @@ def iter_batch[T](
 def run_batch[T](
     executor: concurrent.futures.Executor,
     func: Callable[..., T],
-    kwargs_list: Iterable[dict[str, Any]],
+    kwargs_iterable: Iterable[dict[str, Any]],
     batch_size: int = 32,
 ) -> list[T]:
     results: list[T | None] = []
 
-    for index, result in iter_batch(executor, func, kwargs_list, batch_size):
+    for index, result in iter_batch(executor, func, kwargs_iterable, batch_size):
         while len(results) <= index:
             results.append(None)
         results[index] = result
@@ -73,7 +73,7 @@ async def _async_indexed_wrapper[T, **P](
 async def aiter_batch[T](
     task_group: asyncio.TaskGroup,
     func: Callable[..., Awaitable[T]],
-    kwargs_list: Iterable[dict[str, Any]],
+    kwargs_iterable: Iterable[dict[str, Any]],
     batch_size: int = 32,
 ) -> AsyncIterator[tuple[int, T]]:
     batch_size = max(1, batch_size)
@@ -81,7 +81,7 @@ async def aiter_batch[T](
     pending: set[asyncio.Task[tuple[int, T]]] = set()
     done: set[asyncio.Task[tuple[int, T]]]
 
-    for i, kwargs in enumerate(kwargs_list):
+    for i, kwargs in enumerate(kwargs_iterable):
         while len(pending) >= batch_size:
             done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
@@ -97,12 +97,12 @@ async def aiter_batch[T](
 async def arun_batch[T](
     task_group: asyncio.TaskGroup,
     func: Callable[..., Awaitable[T]],
-    kwargs_list: Iterable[dict[str, Any]],
+    kwargs_iterable: Iterable[dict[str, Any]],
     batch_size: int = 32,
 ) -> list[T]:
     results: list[T | None] = []
 
-    async for index, result in aiter_batch(task_group, func, kwargs_list, batch_size):
+    async for index, result in aiter_batch(task_group, func, kwargs_iterable, batch_size):
         while len(results) <= index:
             results.append(None)
         results[index] = result

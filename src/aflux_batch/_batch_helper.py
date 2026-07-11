@@ -7,6 +7,12 @@ from collections.abc import (
     Iterable,
     Iterator,
 )
+from concurrent.futures import (
+    Executor,
+    Future,
+    ThreadPoolExecutor,
+)
+from contextlib import AsyncExitStack, ExitStack
 from typing import Any, cast
 
 
@@ -21,15 +27,16 @@ def _sync_indexed_wrapper[T, **P](
 
 
 def iter_batch[T](
-    executor: concurrent.futures.Executor,
     func: Callable[..., T],
     kwargs_iterable: Iterable[dict[str, Any]],
+    *,
+    executor: Executor,
     batch_size: int = 32,
 ) -> Iterator[tuple[int, T]]:
     batch_size = max(1, batch_size)
 
-    pending: set[concurrent.futures.Future[tuple[int, T]]] = set()
-    done: set[concurrent.futures.Future[tuple[int, T]]]
+    pending: set[Future[tuple[int, T]]] = set()
+    done: set[Future[tuple[int, T]]]
 
     for i, kwargs in enumerate(kwargs_iterable):
         while len(pending) >= batch_size:
@@ -45,17 +52,23 @@ def iter_batch[T](
 
 
 def run_batch[T](
-    executor: concurrent.futures.Executor,
     func: Callable[..., T],
     kwargs_iterable: Iterable[dict[str, Any]],
+    *,
+    executor: Executor | None = None,
     batch_size: int = 32,
 ) -> list[T]:
-    results: list[T | None] = []
+    batch_size = max(1, batch_size)
 
-    for index, result in iter_batch(executor, func, kwargs_iterable, batch_size):
-        while len(results) <= index:
-            results.append(None)
-        results[index] = result
+    with ExitStack() as stack:
+        if executor is None:
+            executor = stack.enter_context(ThreadPoolExecutor(max_workers=batch_size))
+
+        results: list[T | None] = []
+        for index, result in iter_batch(func, kwargs_iterable, executor=executor, batch_size=batch_size):
+            while len(results) <= index:
+                results.append(None)
+            results[index] = result
 
     return cast(list[T], results)
 
@@ -71,9 +84,10 @@ async def _async_indexed_wrapper[T, **P](
 
 
 async def aiter_batch[T](
-    task_group: asyncio.TaskGroup,
     func: Callable[..., Awaitable[T]],
     kwargs_iterable: Iterable[dict[str, Any]],
+    *,
+    task_group: asyncio.TaskGroup,
     batch_size: int = 32,
 ) -> AsyncIterator[tuple[int, T]]:
     batch_size = max(1, batch_size)
@@ -95,16 +109,22 @@ async def aiter_batch[T](
 
 
 async def arun_batch[T](
-    task_group: asyncio.TaskGroup,
     func: Callable[..., Awaitable[T]],
     kwargs_iterable: Iterable[dict[str, Any]],
+    *,
+    task_group: asyncio.TaskGroup | None = None,
     batch_size: int = 32,
 ) -> list[T]:
-    results: list[T | None] = []
+    batch_size = max(1, batch_size)
 
-    async for index, result in aiter_batch(task_group, func, kwargs_iterable, batch_size):
-        while len(results) <= index:
-            results.append(None)
-        results[index] = result
+    async with AsyncExitStack() as stack:
+        if task_group is None:
+            task_group = await stack.enter_async_context(asyncio.TaskGroup())
+
+        results: list[T | None] = []
+        async for index, result in aiter_batch(func, kwargs_iterable, task_group=task_group, batch_size=batch_size):
+            while len(results) <= index:
+                results.append(None)
+            results[index] = result
 
     return cast(list[T], results)

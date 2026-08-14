@@ -17,6 +17,11 @@ from typing import Any, cast
 
 
 class Payload:
+    """Arguments for one call.
+
+    Positional and keyword arguments are passed to the target function unchanged.
+    """
+
     __slots__ = ("args", "kwargs")
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -39,6 +44,12 @@ def iter_batch[T](
     executor: Executor,
     batch_size: int = 32,
 ) -> Iterator[tuple[int, T]]:
+    """Yield indexed results as calls finish.
+
+    At most `batch_size` submitted calls remain unfinished at once.
+    Results are yielded in completion order, along with the payload index.
+    """
+
     batch_size = max(1, batch_size)
 
     pending: set[Future[tuple[int, T]]] = set()
@@ -68,6 +79,11 @@ def run_batch[T](
     executor: Executor | None = None,
     batch_size: int = 32,
 ) -> list[T]:
+    """Process all payloads and return results in payload order.
+
+    When `executor` is omitted, creates a thread pool with `batch_size` workers.
+    """
+
     batch_size = max(1, batch_size)
 
     with ExitStack() as stack:
@@ -98,6 +114,12 @@ async def aiter_batch[T](
     task_group: asyncio.TaskGroup,
     batch_size: int = 32,
 ) -> AsyncIterator[tuple[int, T]]:
+    """Yield indexed results as calls finish.
+
+    At most `batch_size` created tasks remain unfinished at once.
+    Results are yielded in completion order, along with the payload index.
+    """
+
     batch_size = max(1, batch_size)
 
     pending: set[asyncio.Task[tuple[int, T]]] = set()
@@ -127,6 +149,11 @@ async def arun_batch[T](
     task_group: asyncio.TaskGroup | None = None,
     batch_size: int = 32,
 ) -> list[T]:
+    """Process all payloads and return results in payload order.
+
+    When `task_group` is omitted, creates and manages a task group for this batch.
+    """
+
     batch_size = max(1, batch_size)
 
     async with AsyncExitStack() as stack:
